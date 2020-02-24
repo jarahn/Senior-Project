@@ -7,6 +7,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import QIcon
 import pyqtgraph as pg
 import obd
+import time
 
 # Setting these as global variables for access from callback function
 # number display (called lcd)
@@ -19,21 +20,6 @@ tempDspNum = 0
 speed = []
 rpms = []
 engineLoad = []
-
-
-class OtherWindow(QMainWindow):
-    def __init__(self):
-        QMainWindow.__init__(self)
-        layout = QHBoxLayout()
-        lineEdit = QLineEdit()
-        lineEdit.setText("Just to fill up the dialog")
-        layout.addWidget(lineEdit)
-
-        self.widget = QWidget()
-        self.widget.setLayout(layout)
-
-        self.setCentralWidget(self.widget)
-        self.setWindowTitle("Win2")
 
 
 class Example(QMainWindow):
@@ -60,8 +46,8 @@ class Example(QMainWindow):
         menubar = self.menuBar()
         # creates a menu item - whatever that means
         fileMenu = menubar.addMenu('&Actions')
-        menubar.addMenu('&Previous Trips')
-        menubar.addMenu('&Settings')
+        # menubar.addMenu('&Previous Trips')
+        # menubar.addMenu('&Settings')
         # adds desired action to the menu item
         fileMenu.addAction(exitAct)
 
@@ -155,12 +141,20 @@ class Example(QMainWindow):
         # Create points for the graph widget to plot
         hour = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         temperature = [30, 32, 34, 32, 33, 31, 29, 32, 35, 45]
-        speedGraph.plot(hour, temperature)
-        rpmGraph.plot(hour, temperature)
-        engineGraph.plot(hour, temperature)
+        startTime = 0
+        stopTime = 0
+        # speedGraph.plot(hour, temperature)
+        # rpmGraph.plot(hour, temperature)
+        # engineGraph.plot(hour, temperature)
+        rpmGraph.setLabel('left', 'Revolutions', units='per second')
+        rpmGraph.setLabel('bottom', 'Time', units='s')
+        speedGraph.setLabel('left', 'Speed', units='MPH')
+        speedGraph.setLabel('bottom', 'Time', units='s')
+        engineGraph.setLabel('left', 'Engine Load', units='%')
+        engineGraph.setLabel('bottom', 'Time', units='s')
 
-        graphsLayout.addWidget(startTrip, 1, 0)
-        graphsLayout.addWidget(stopTrip, 2, 0)
+        graphsLayout.addWidget(startTrip, 0, 1)
+        graphsLayout.addWidget(stopTrip, 0, 3)
         graphsLayout.addWidget(speedGraph, 1, 1)
         graphsLayout.addWidget(rpmGraph, 1, 2)
         graphsLayout.addWidget(engineGraph, 1, 3)
@@ -171,6 +165,7 @@ class Example(QMainWindow):
         tripsLayout = QGridLayout()
         tripsLayout.setSpacing(10)
 
+        # TODO: Tab Layout
         # Tabs can be added to a QTabWidget. The QTabWidget can be added to a layout and the layout to the window.
         tabsLayout = QGridLayout()
         tabsLayout.setSpacing(10)
@@ -196,6 +191,8 @@ class Example(QMainWindow):
 
         tabsLayout.addWidget(tabWidget, 0, 0)
 
+        test = "yes"
+
         # this allows you to place a widget as the central widget - keeping it separate from the main window
         tabsWidg = QWidget()
         tabsWidg.setLayout(tabsLayout)
@@ -212,24 +209,22 @@ class Example(QMainWindow):
         # connection.stop()
         # obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
         # connection = obd.OBD(portstr="\\.\\COM3", fast=False)
-        '''
+
         checkForCodes = obd.commands.STATUS
         statusRsp = connection.query(checkForCodes)
         # if not response.is_null():
+        # RANDY
+        self.test = "no"
         if statusRsp.value.DTC_count == 0:
-            print("No Codes!")
+            self.codesDsp.display(0)
         else:
-            print("You have " + str(statusRsp.value.DTC_count) + " engine codes.")
+            self.codesDsp.display(statusRsp.value.DTC_count)
         # else:
             # print("Unable to retrieve trouble code information.")
-        '''
 
     def readTheCodes(self):
         print('Codes read!')
 
-        QMessageBox.question(self, 'Trouble Code Data', "Codes: ", QMessageBox.Ok,
-                             QMessageBox.Ok)
-        '''
         # could optimize to only allow button click when checkTheCodes has a nonzero value
         checkForCodes = obd.commands.STATUS
         statusRsp = connection.query(checkForCodes)
@@ -244,41 +239,44 @@ class Example(QMainWindow):
             # Extract info out of the response tuple (codes) or list if multiple codes - ASK RANDY HOW TO DO THIS
         # else:
             # print("Unable to retrieve trouble code information.")
-        '''
+        QMessageBox.question(self, 'Trouble Code Data', "Codes: ", QMessageBox.Ok,
+                             QMessageBox.Ok)
+
     def runFreezeFrame(self):
         print('Getting freeze frame data!')
 
-        '''
         # again - could optimize to only allow button click when checkTheCodes has a nonzero value
         freezeData = ""
         checkForCodes = obd.commands.STATUS
         statusRsp = connection.query(checkForCodes)
 
-        # if not response.is_null():
-            if response.value.DTC_count == 0:
+        if not statusRsp.is_null():
+            if statusRsp.value.DTC_count == 0:
                 freezeData = "No Codes!"
             else:
                 # get RPMs when code was thrown
+                '''
                 rpmCmd = obd.commands.DTC_RPM
                 rpmResponse = connection.query(rpmCmd)
                 freezeData = "RPMs: " + rpmResponse.value
+                '''
     
                 # get speed when code was thrown
                 speedCmd = obd.commands.DTC_SPEED
                 speedResponse = connection.query(speedCmd)
-                freezeData += "Speed: " + speedResponse.value
+                freezeData += "Speed: " + str(speedResponse.value)
     
                 # decide what other info is relevant and create queries
-        # else:
+        else:
             freezeData = "Unable to retrieve trouble code information."
-        '''
+
         # Take quotes off of freezeData when ready
-        QMessageBox.question(self, 'Freeze Frame Data', "freezeData", QMessageBox.Ok,
+        QMessageBox.question(self, 'Freeze Frame Data', freezeData, QMessageBox.Ok,
                              QMessageBox.Ok)
 
     def clearTheCodes(self):
         print('The car is fixed!')
-        '''
+
         # again - could optimize to only allow button click when checkTheCodes has a nonzero value
         checkForCodes = obd.commands.STATUS
         statusRsp = connection.query(checkForCodes)
@@ -291,7 +289,9 @@ class Example(QMainWindow):
             print('All codes cleared!')
         # else:
             # print("Unable to retrieve trouble code information.")
-        '''
+
+        QMessageBox.question(self, 'Clearing Codes', "The trouble codes have been cleared!", QMessageBox.Ok,
+                             QMessageBox.Ok)
 
     def startTripLog(self):
         print("starting trip!")
@@ -301,20 +301,27 @@ class Example(QMainWindow):
         obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
         connection = obd.Async(portstr="\\.\\COM3", fast=False)
         
+        # start counter for graph purposes
+        self.startTime = time.time()
+        
+        
         '''
 
     def endTrip(self):
         print("ending the trip!")
         '''
-        # Need to check if plotting here will update the graphs
-        speedGraph.plot(time, speed)
-        rpmGraph.plot(time, rpms)
-        engineGraph.plot(time, engineLoad)
+        self.endTime = time.time()
+        tpTime = (self.startTime - self.endTime)
+        tripTime = range(0, tpTime)
+        self.speedGraph.plot(tripTime, speed)
+        self.rpmGraph.plot(tripTime, rpms)
+        self.engineGraph.plot(tripTime, engineLoad)
         '''
 
 
 if __name__ == '__main__':
-    '''
+    # Start gui in asynch mode so we can update live displays
+
     obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
     connection = obd.OBD(portstr="\\.\\COM3", fast=False)
     
@@ -334,7 +341,7 @@ if __name__ == '__main__':
     cmd4 = obd.commands.INTAKE_TEMP
     response4 = connection.query(cmd4)
     print(response4.value)      # Temp is in Celsius
-    '''
+
     app = QApplication(sys.argv)
     # Calls the application class we created
     ex = Example()

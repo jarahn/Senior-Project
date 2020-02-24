@@ -45,9 +45,18 @@ connection.start()
 # the callback will now be fired upon receipt of new values
 
 # Let the asynch mode run for 60
-time.sleep(60)
+time.sleep(10)
 # Stop the asynch query (ALWAYS INCLUDE!!)
 connection.stop()
+connection.close()
+
+obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
+connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+
+cmd = obd.commands.SPEED  # select an OBD command (sensor)
+response = connection.query(cmd)  # send the command, and parse the response
+# print(response.value)  # returns unit-bearing values thanks to Pint
+print(response.value.to("mph"))  # user-friendly unit conversions
 
 # Class to manage accessing PCM(ECU) trouble codes
 ''' class EcuCodes:
