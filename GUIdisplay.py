@@ -113,14 +113,14 @@ class Example(QMainWindow):
         freezeFrame.clicked.connect(self.runFreezeFrame)
         clearCodes.clicked.connect(self.clearTheCodes)
 
-        codesLayout.addWidget(checkCodes, 1, 1)
+        codesLayout.addWidget(checkCodes, 1, 1, 2, 1)
         # layout for title/number display
         codesLayout.addWidget(numCodesLbl, 3, 0)
-        codesLayout.addWidget(codesDsp, 3, 1)
+        codesLayout.addWidget(codesDsp, 3, 1, 1, 1)
 
-        codesLayout.addWidget(readCodes, 4, 1)
-        codesLayout.addWidget(freezeFrame, 5, 1)
-        codesLayout.addWidget(clearCodes, 6, 1)
+        codesLayout.addWidget(readCodes, 4, 1, 2, 1)
+        codesLayout.addWidget(freezeFrame, 5, 1, 2, 1)
+        codesLayout.addWidget(clearCodes, 6, 1, 2, 1)
 
         # TODO:
         # TRIP LOGGER WIDGET
@@ -144,9 +144,9 @@ class Example(QMainWindow):
         temperature = [30, 32, 34, 32, 33, 31, 29, 32, 35, 45]
         startTime = 0
         stopTime = 0
-        # speedGraph.plot(hour, temperature)
-        # rpmGraph.plot(hour, temperature)
-        # engineGraph.plot(hour, temperature)
+        speedGraph.plot(hour, temperature, pen='g')
+        rpmGraph.plot(hour, temperature, pen='r')
+        engineGraph.plot(hour, temperature, pen='w')
         rpmGraph.setLabel('left', 'Revolutions', units='per second')
         rpmGraph.setLabel('bottom', 'Time', units='s')
         speedGraph.setLabel('left', 'Speed', units='MPH')
@@ -165,6 +165,12 @@ class Example(QMainWindow):
         # Layout
         tripsLayout = QGridLayout()
         tripsLayout.setSpacing(10)
+
+        # TODO:
+        # EMISSIONS WIDGET
+        # Layout
+        emissionsLayout = QGridLayout()
+        emissionsLayout.setSpacing(10)
 
         # TODO: Tab Layout
         # Tabs can be added to a QTabWidget. The QTabWidget can be added to a layout and the layout to the window.
@@ -189,6 +195,10 @@ class Example(QMainWindow):
         widget4 = QWidget()
         widget4.setLayout(tripsLayout)
         tabWidget.addTab(widget4, "Previous Trips")
+
+        widget5 = QWidget()
+        widget5.setLayout(emissionsLayout)
+        tabWidget.addTab(widget5, "Emissions Test")
 
         tabsLayout.addWidget(tabWidget, 0, 0)
 
@@ -320,9 +330,10 @@ class Example(QMainWindow):
         '''
 
 
+
 if __name__ == '__main__':
     # Start gui in asynch mode so we can update live displays
-
+    '''
     obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
     connection = obd.OBD(portstr="\\.\\COM3", fast=False)
     
@@ -342,6 +353,7 @@ if __name__ == '__main__':
     cmd4 = obd.commands.INTAKE_TEMP
     response4 = connection.query(cmd4)
     print(response4.value)      # Temp is in Celsius
+    '''
 
     app = QApplication(sys.argv)
     # Calls the application class we created
