@@ -10,16 +10,16 @@ import obd
 import time
 
 # Setting these as global variables for access from callback function
-# number display (called lcd)
+speedDsp = None
+rpmDsp = None
+loadDsp = None
+tempDsp = None
+startTime = None
+endTime = None
 
-speedDspNum = 0
-rpmDspNum = 0
-engineDspNum = 0
-tempDspNum = 0
-
-speed = []
-rpms = []
-engineLoad = []
+# speed = []
+# rpms = []
+# engineLoad = []
 
 
 # Testing github 2/24/20
@@ -39,8 +39,150 @@ class Example(QMainWindow):
         # Emits signal to terminate application - this is how you connect a function to a menu item or button
         # This is highlighted for some reason but still works
         exitAct.triggered.connect(qApp.quit)    # could I stop the asynch connection using this?
-
         self.statusBar()
+
+        def checkTheCodes():
+            print('Checking for codes!')
+            # STOP ASYNCH HERE AND START STANDARD CONNECTION
+            global connection
+            connection.stop()
+            connection.close()
+            obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging purposes
+            connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+
+            checkForCodes = obd.commands.STATUS
+            statusRsp = connection.query(checkForCodes)
+            if not statusRsp.is_null():
+                if statusRsp.value.DTC_count == 0:
+                    codesDsp.display(0)
+                else:
+                    codesDsp.display(statusRsp.value.DTC_count)
+                    readCodes.setEnabled(True)
+                    freezeFrame.setEnabled(True)
+                    clearCodes.setEnabled(True)
+            else:
+                print("Unable to retrieve trouble code information.")
+
+        def readTheCodes():
+            print('Codes read!')
+
+            checkForCodes = obd.commands.STATUS
+            statusRsp = connection.query(checkForCodes)
+
+            if not statusRsp.is_null():
+                if statusRsp.value.DTC_count == 0:
+                    codeData = "No Codes!"
+                else:
+                    codeReader = obd.commands.GET_DTC
+                    codeRsp = connection.query(codeReader)
+                    codeData = str(codeRsp.value)
+                    # Extract info out of the response tuple (codes) or list if multiple codes -ASK RANDY HOW TO DO THIS
+            else:
+                codeData = "Unable to retrieve trouble code information."
+            QMessageBox.information(self, 'Trouble Code Data', codeData, QMessageBox.Ok, QMessageBox.Ok)
+
+        def runFreezeFrame():
+            print('Getting freeze frame data!')
+
+            checkForCodes = obd.commands.STATUS
+            statusRsp = connection.query(checkForCodes)
+
+            if not statusRsp.is_null():
+                if statusRsp.value.DTC_count == 0:
+                    freezeData = "No Codes!"
+                else:
+                    # get RPMs when code was thrown
+                    '''
+                    rpmCmd = obd.commands.DTC_RPM
+                    rpmResponse = connection.query(rpmCmd)
+                    freezeData = "RPMs: " + rpmResponse.value
+                    '''
+
+                    # get speed when code was thrown
+                    speedCmd = obd.commands.DTC_SPEED
+                    speedResponse = connection.query(speedCmd)
+                    freezeData = "Speed: " + str(speedResponse.value)
+
+                    # decide what other info is relevant and create queries
+            else:
+                freezeData = "Unable to retrieve trouble code information."
+
+            # Take quotes off of freezeData when ready
+            QMessageBox.information(self, 'Freeze Frame Data', freezeData, QMessageBox.Ok, QMessageBox.Ok)
+
+        def clearTheCodes():
+            print('The car is fixed!')
+
+            # again - could optimize to only allow button click when checkTheCodes has a nonzero value
+            checkForCodes = obd.commands.STATUS
+            statusRsp = connection.query(checkForCodes)
+
+            if not statusRsp.is_null():
+                if statusRsp.value.DTC_count == 0:
+                    clearMsg = "No codes to clear!"
+                else:
+                    # obd.commands.CLEAR_DTC
+                    clearMsg = "All codes cleared!"
+            else:
+                clearMsg = "Unable to retrieve trouble code information."
+
+            QMessageBox.information(self, 'Clearing Codes', clearMsg, QMessageBox.Ok, QMessageBox.Ok)
+
+        def startTripLog(self):
+            print("starting trip!")
+
+            # restart asynch connection - SHOULD HAVE A BOOLEAN FOR CHECKING IF ASYNCH OR STANDARD
+            global connection
+            connection.close()
+            obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
+            connection = obd.Async(portstr="\\.\\COM3", baudrate=38400, fast=False)
+
+            def new_speed(s):
+                speed.append(int(s.value.magnitude))
+
+            def new_rpm(r):
+                rpms.append(int(r.value.magnitude))
+
+            def new_load(ld):
+                engineLoad.append(int(ld.value.magnitude))
+
+            connection.watch(obd.commands.SPEED, callback=new_speed)
+            connection.watch(obd.commands.RPM, callback=new_rpm)
+            connection.watch(obd.commands.ENGINE_LOAD, callback=new_load)
+
+            # Start asynch connection
+            connection.start()
+
+            # start counter for graph purposes
+            global startTime
+            startTime = time.time_ns()
+            # Enable stopping of trip
+            stopTrip.setEnabled(True)
+
+        def endTrip(self):
+            print("ending the trip!")
+
+            # Stop Asynch connection
+            global connection
+            connection.stop()
+            connection.close()
+
+            global endTime
+            endTime = time.time_ns()
+            timeSec = int((endTime - startTime) / 1000000000)
+            tripTime = range(0, int(timeSec))
+            # tripTime = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+            print(startTime)
+            print(endTime)
+            print(tripTime)
+            print(*speed)
+            print(*rpms)
+            speedGraph.plot(tripTime, speed)
+            rpmGraph.plot(tripTime, rpms)
+            engineGraph.plot(tripTime, engineLoad)
+            print("plotted!")
+
+            # speedGraph.plot(hour, temperature)
 
         # TODO: revise this section
         # creates a menu
@@ -67,11 +209,15 @@ class Example(QMainWindow):
 
         # TODO: Hook up qlcd to the asynch callback function for speed, etc.
         # number display (called lcd)
+        global speedDsp
+        global rpmDsp
+        global loadDsp
+        global tempDsp
         speedDsp = QLCDNumber(self)
         rpmDsp = QLCDNumber(self)
         loadDsp = QLCDNumber(self)
         tempDsp = QLCDNumber(self)
-        speedDsp.display(10.5)
+        # speedDsp.display(speedDspNum)
 
         # using a grid layout to manage the layout of the page
         grid = QGridLayout()
@@ -102,16 +248,27 @@ class Example(QMainWindow):
         freezeFrame = QPushButton('Get Freeze Frame Data')      # open new window with info
         clearCodes = QPushButton('Clear Any Existing Codes')  # reset num and make button unclickable -display message?
 
+        # style for buttons
+        '''
+        clearCodes.setStyleSheet("QPushButton { background-color: blue }" "QPushButton:pressed { background-color: "
+                                 "red }")
+        '''
+
+        # Button control for professional style
+        readCodes.setEnabled(False)
+        freezeFrame.setEnabled(False)
+        clearCodes.setEnabled(False)
+
         # Display for # of codes - Currently displays zero before button press consider changing
         numCodesLbl = QLabel('Number of Trouble Codes')
         codesDsp = QLCDNumber(self)
 
         # Connect the button to a function on button click
         # RANDY- why does using self tell python im talking about the function
-        checkCodes.clicked.connect(self.checkTheCodes)
-        readCodes.clicked.connect(self.readTheCodes)
-        freezeFrame.clicked.connect(self.runFreezeFrame)
-        clearCodes.clicked.connect(self.clearTheCodes)
+        checkCodes.clicked.connect(checkTheCodes)
+        readCodes.clicked.connect(readTheCodes)
+        freezeFrame.clicked.connect(runFreezeFrame)
+        clearCodes.clicked.connect(clearTheCodes)
 
         codesLayout.addWidget(checkCodes, 1, 1, 2, 1)
         # layout for title/number display
@@ -136,17 +293,19 @@ class Example(QMainWindow):
         # button for starting/stopping trip (reconnect to asynch connection)
         startTrip = QPushButton('Start Your Trip')  # display in window
         stopTrip = QPushButton('Stop Your Trip')  # display in window
-        startTrip.clicked.connect(self.startTripLog)
-        stopTrip.clicked.connect(self.endTrip)
+        startTrip.clicked.connect(startTripLog)
+        stopTrip.clicked.connect(endTrip)
+        stopTrip.setEnabled(False)
 
         # Create points for the graph widget to plot
         hour = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         temperature = [30, 32, 34, 32, 33, 31, 29, 32, 35, 45]
-        startTime = 0
-        stopTime = 0
-        speedGraph.plot(hour, temperature, pen='g')
-        rpmGraph.plot(hour, temperature, pen='r')
-        engineGraph.plot(hour, temperature, pen='w')
+        speed = []
+        rpms = []
+        engineLoad = []
+        # speedGraph.plot(hour, temperature, pen='g')
+        # rpmGraph.plot(hour, temperature, pen='r')
+        # engineGraph.plot(hour, temperature, pen='w')
         rpmGraph.setLabel('left', 'Revolutions', units='per second')
         rpmGraph.setLabel('bottom', 'Time', units='s')
         speedGraph.setLabel('left', 'Speed', units='MPH')
@@ -202,161 +361,59 @@ class Example(QMainWindow):
 
         tabsLayout.addWidget(tabWidget, 0, 0)
 
-        test = "yes"
-
         # this allows you to place a widget as the central widget - keeping it separate from the main window
         tabsWidg = QWidget()
         tabsWidg.setLayout(tabsLayout)
         self.setCentralWidget(tabsWidg)
 
+        # Main styling for GUI
+        # self.setStyleSheet("background-color:#6e6e6e")
+        # Can also do like normal CSS ex:
+        '''
+        QMainWindow{
+            background-color:#6e6e6e;
+        }
+        '''
+
         self.setGeometry(700, 250, 500, 400)
         self.setWindowTitle('Menu')
         self.show()
 
-    # Function connected to the check codes button press
-    def checkTheCodes(self):
-        print('Checking for codes!')
-        # STOP ASYNCH HERE AND START STANDARD CONNECTION
-        # connection.stop()
-        # obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
-        # connection = obd.OBD(portstr="\\.\\COM3", fast=False)
-
-        checkForCodes = obd.commands.STATUS
-        statusRsp = connection.query(checkForCodes)
-        # if not response.is_null():
-        # RANDY
-        self.test = "no"
-        if statusRsp.value.DTC_count == 0:
-            self.codesDsp.display(0)
-        else:
-            self.codesDsp.display(statusRsp.value.DTC_count)
-        # else:
-            # print("Unable to retrieve trouble code information.")
-
-    def readTheCodes(self):
-        print('Codes read!')
-
-        # could optimize to only allow button click when checkTheCodes has a nonzero value
-        checkForCodes = obd.commands.STATUS
-        statusRsp = connection.query(checkForCodes)
-
-        # if not statusRsp.is_null():
-        if statusRsp.value.DTC_count == 0:
-            print("No Codes!")
-        else:
-            codeReader = obd.commands.GET_DTC
-            codeRsp = connection.query(codeReader)
-            print(codeRsp.value)
-            # Extract info out of the response tuple (codes) or list if multiple codes - ASK RANDY HOW TO DO THIS
-        # else:
-            # print("Unable to retrieve trouble code information.")
-        QMessageBox.question(self, 'Trouble Code Data', "Codes: ", QMessageBox.Ok,
-                             QMessageBox.Ok)
-
-    def runFreezeFrame(self):
-        print('Getting freeze frame data!')
-
-        # again - could optimize to only allow button click when checkTheCodes has a nonzero value
-        freezeData = ""
-        checkForCodes = obd.commands.STATUS
-        statusRsp = connection.query(checkForCodes)
-
-        if not statusRsp.is_null():
-            if statusRsp.value.DTC_count == 0:
-                freezeData = "No Codes!"
-            else:
-                # get RPMs when code was thrown
-                '''
-                rpmCmd = obd.commands.DTC_RPM
-                rpmResponse = connection.query(rpmCmd)
-                freezeData = "RPMs: " + rpmResponse.value
-                '''
-    
-                # get speed when code was thrown
-                speedCmd = obd.commands.DTC_SPEED
-                speedResponse = connection.query(speedCmd)
-                freezeData += "Speed: " + str(speedResponse.value)
-    
-                # decide what other info is relevant and create queries
-        else:
-            freezeData = "Unable to retrieve trouble code information."
-
-        # Take quotes off of freezeData when ready
-        QMessageBox.question(self, 'Freeze Frame Data', freezeData, QMessageBox.Ok,
-                             QMessageBox.Ok)
-
-    def clearTheCodes(self):
-        print('The car is fixed!')
-
-        # again - could optimize to only allow button click when checkTheCodes has a nonzero value
-        checkForCodes = obd.commands.STATUS
-        statusRsp = connection.query(checkForCodes)
-
-        # if not response.is_null():
-        if statusRsp.value.DTC_count == 0:
-            print("No codes to clear!")
-        else:
-            # obd.commands.CLEAR_DTC
-            print('All codes cleared!')
-        # else:
-            # print("Unable to retrieve trouble code information.")
-
-        QMessageBox.question(self, 'Clearing Codes', "The trouble codes have been cleared!", QMessageBox.Ok,
-                             QMessageBox.Ok)
-
-    def startTripLog(self):
-        print("starting trip!")
-        # Have something as a placeholder for the graphs
-        '''
-        # restart asynch connection
-        obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
-        connection = obd.Async(portstr="\\.\\COM3", fast=False)
-        
-        # start counter for graph purposes
-        self.startTime = time.time()
-        
-        
-        '''
-
-    def endTrip(self):
-        print("ending the trip!")
-        '''
-        self.endTime = time.time()
-        tpTime = (self.startTime - self.endTime)
-        tripTime = range(0, tpTime)
-        self.speedGraph.plot(tripTime, speed)
-        self.rpmGraph.plot(tripTime, rpms)
-        self.engineGraph.plot(tripTime, engineLoad)
-        '''
-
+        # Function connected to the check codes button press
 
 
 if __name__ == '__main__':
     # Start gui in asynch mode so we can update live displays
-    '''
-    obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
-    connection = obd.OBD(portstr="\\.\\COM3", fast=False)
-    
-    cmd = obd.commands.SPEED  # select an OBD command (sensor)
-    response = connection.query(cmd)  # send the command, and parse the response
-    # print(response.value)  # returns unit-bearing values thanks to Pint
-    print(response.value.to("mph"))  # user-friendly unit conversions
-    
-    cmd2 = obd.commands.RPM
-    response2 = connection.query(cmd2)
-    print(response2.value)
-    
-    cmd3 = obd.commands.ENGINE_LOAD
-    response3 = connection.query(cmd3)
-    print(response3.value)      # % of engine load
-    
-    cmd4 = obd.commands.INTAKE_TEMP
-    response4 = connection.query(cmd4)
-    print(response4.value)      # Temp is in Celsius
-    '''
 
+    obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
+    connection = obd.Async(portstr="\\.\\COM3", fast=False)
+
+    def new_spd(s):
+        speedDsp.display(int(s.value.magnitude))
+
+
+    def new_rotations(r):
+        rpmDsp.display(int(r.value.magnitude))
+
+
+    def new_engineLd(ld):
+        loadDsp.display(int(ld.value.magnitude))
+
+
+    def new_intakeT(t):
+        tempDsp.display(int(t.value.magnitude))
+
+    connection.watch(obd.commands.SPEED, callback=new_spd)
+    connection.watch(obd.commands.RPM, callback=new_rotations)
+    connection.watch(obd.commands.ENGINE_LOAD, callback=new_engineLd)
+    connection.watch(obd.commands.INTAKE_TEMP, callback=new_intakeT)    
+    
     app = QApplication(sys.argv)
     # Calls the application class we created
     ex = Example()
+    
+    # Start asynch query of all watched commands
+    connection.start()
+    
     # Enters the gui application into its main loop
     sys.exit(app.exec_())
