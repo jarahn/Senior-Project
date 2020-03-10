@@ -16,6 +16,7 @@ loadDsp = None
 tempDsp = None
 startTime = None
 endTime = None
+connection = None
 
 # speed = []
 # rpms = []
@@ -44,12 +45,13 @@ class Example(QMainWindow):
         def checkTheCodes():
             print('Checking for codes!')
             # STOP ASYNCH HERE AND START STANDARD CONNECTION
+            '''
             global connection
             connection.stop()
             connection.close()
             obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging purposes
             connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
-
+            '''
             checkForCodes = obd.commands.STATUS
             statusRsp = connection.query(checkForCodes)
             if not statusRsp.is_null():
@@ -132,6 +134,7 @@ class Example(QMainWindow):
             print("starting trip!")
 
             # restart asynch connection - SHOULD HAVE A BOOLEAN FOR CHECKING IF ASYNCH OR STANDARD
+            '''
             global connection
             connection.close()
             obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
@@ -152,7 +155,7 @@ class Example(QMainWindow):
 
             # Start asynch connection
             connection.start()
-
+            '''
             # start counter for graph purposes
             global startTime
             startTime = time.time_ns()
@@ -183,6 +186,63 @@ class Example(QMainWindow):
             print("plotted!")
 
             # speedGraph.plot(hour, temperature)
+
+        # This function should handle all connection changes, including the initial connection (needs to be tested)
+            # - called every time the tab changes.
+        def setConnection(tabIndex):
+            print(tabIndex)
+            '''
+            global connection
+            connection.stop()
+            connection.close()
+            
+            if tabIndex == 0:
+                obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging
+                connection = obd.Async(portstr="\\.\\COM3", fast=False)
+
+                def new_spd(s):
+                    speedDsp.display(int(s.value.magnitude))
+
+                def new_rotations(r):
+                    rpmDsp.display(int(r.value.magnitude))
+
+                def new_engineLd(ld):
+                    loadDsp.display(int(ld.value.magnitude))
+
+                def new_intakeT(t):
+                    tempDsp.display(int(t.value.magnitude))
+
+                connection.watch(obd.commands.SPEED, callback=new_spd)
+                connection.watch(obd.commands.RPM, callback=new_rotations)
+                connection.watch(obd.commands.ENGINE_LOAD, callback=new_engineLd)
+                connection.watch(obd.commands.INTAKE_TEMP, callback=new_intakeT)
+                # Start asynch connection
+                connection.start()
+                
+            elif tabIndex == 1:
+                obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
+                connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+                
+            else:
+                obd.logger.setLevel(
+                    obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
+                connection = obd.Async(portstr="\\.\\COM3", baudrate=38400, fast=False)
+
+                def new_speed(s):
+                    speed.append(int(s.value.magnitude))
+
+                def new_rpm(r):
+                    rpms.append(int(r.value.magnitude))
+
+                def new_load(ld):
+                    engineLoad.append(int(ld.value.magnitude))
+
+                connection.watch(obd.commands.SPEED, callback=new_speed)
+                connection.watch(obd.commands.RPM, callback=new_rpm)
+                connection.watch(obd.commands.ENGINE_LOAD, callback=new_load)
+                # Start asynch connection
+                connection.start()
+            '''
 
         # TODO: revise this section
         # creates a menu
@@ -339,25 +399,25 @@ class Example(QMainWindow):
         tabWidget = QTabWidget()
 
         # You can add anything from a button or label to a full widget when adding a tab
-        widget1 = QWidget()
-        widget1.setLayout(grid)
-        tabWidget.addTab(widget1, "Dashboard")
+        dash = QWidget()
+        dash.setLayout(grid)
+        tabWidget.addTab(dash, "Dashboard")
 
-        widget2 = QWidget()
-        widget2.setLayout(codesLayout)
-        tabWidget.addTab(widget2, "Codes")
+        cel = QWidget()
+        cel.setLayout(codesLayout)
+        tabWidget.addTab(cel, "Codes")
 
-        widget3 = QWidget()
-        widget3.setLayout(graphsLayout)
-        tabWidget.addTab(widget3, "Current Trip")
+        cTrip = QWidget()
+        cTrip.setLayout(graphsLayout)
+        tabWidget.addTab(cTrip, "Current Trip")
 
-        widget4 = QWidget()
-        widget4.setLayout(tripsLayout)
-        tabWidget.addTab(widget4, "Previous Trips")
+        pTrip = QWidget()
+        pTrip.setLayout(tripsLayout)
+        tabWidget.addTab(pTrip, "Previous Trips")
 
-        widget5 = QWidget()
-        widget5.setLayout(emissionsLayout)
-        tabWidget.addTab(widget5, "Emissions Test")
+        eTest = QWidget()
+        eTest.setLayout(emissionsLayout)
+        tabWidget.addTab(eTest, "Emissions Test")
 
         tabsLayout.addWidget(tabWidget, 0, 0)
 
@@ -366,6 +426,9 @@ class Example(QMainWindow):
         tabsWidg.setLayout(tabsLayout)
         self.setCentralWidget(tabsWidg)
 
+        # Event handlers for tab selection (to make sure the correct connection is established)
+        tabWidget.currentChanged.connect(setConnection)
+        setConnection(0)    # Handles the initial asynch connection
         # Main styling for GUI
         # self.setStyleSheet("background-color:#6e6e6e")
         # Can also do like normal CSS ex:
@@ -384,7 +447,7 @@ class Example(QMainWindow):
 
 if __name__ == '__main__':
     # Start gui in asynch mode so we can update live displays
-
+    '''
     obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
     connection = obd.Async(portstr="\\.\\COM3", fast=False)
 
@@ -407,13 +470,13 @@ if __name__ == '__main__':
     connection.watch(obd.commands.RPM, callback=new_rotations)
     connection.watch(obd.commands.ENGINE_LOAD, callback=new_engineLd)
     connection.watch(obd.commands.INTAKE_TEMP, callback=new_intakeT)    
-    
+    '''
     app = QApplication(sys.argv)
     # Calls the application class we created
     ex = Example()
-    
+
     # Start asynch query of all watched commands
-    connection.start()
+    # connection.start()
     
     # Enters the gui application into its main loop
     sys.exit(app.exec_())
