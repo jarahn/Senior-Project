@@ -162,7 +162,7 @@ class Example(QMainWindow):
             # Enable stopping of trip
             stopTrip.setEnabled(True)
 
-        def endTrip(self):
+        def endTrip(prnt):
             print("ending the trip!")
 
             # Stop Asynch connection
@@ -265,7 +265,7 @@ class Example(QMainWindow):
         speed = QLabel('Speed')
         RPM = QLabel('RPMs')
         codes = QLabel('Engine Load')
-        tempr = QLabel('Temperature')
+        tempr = QLabel('Intake Air Temp.')
 
         # TODO: Hook up qlcd to the asynch callback function for speed, etc.
         # number display (called lcd)
@@ -384,6 +384,16 @@ class Example(QMainWindow):
         # Layout
         tripsLayout = QGridLayout()
         tripsLayout.setSpacing(10)
+        tripLogTxt = QLabel()
+        path = r"C:\Users\jarahn\Documents\pastTrips.docx"
+        url = bytearray(QUrl.fromLocalFile(
+            path).toEncoded()).decode()  # file:///C:/Users/Shaurya/Documents/To%20be%20saved/hello.pdf
+        text = "<a href={}>Past Trips Log </a>".format(url)
+        tripLogTxt.setText(text)
+        tripLogTxt.setOpenExternalLinks(True)
+        tripLogTxt.show()
+        tripsLayout.addWidget(tripLogTxt, 2, 1)
+
 
         # TODO:
         # EMISSIONS WIDGET
