@@ -8,6 +8,8 @@ from PyQt5.QtGui import QIcon
 import pyqtgraph as pg
 import obd
 import time
+from datetime import datetime
+from pytz import timezone
 
 # Setting these as global variables for access from callback function
 speedDsp = None
@@ -174,16 +176,60 @@ class Example(QMainWindow):
             endTime = time.time_ns()
             timeSec = int((endTime - startTime) / 1000000000)
             tripTime = range(0, int(timeSec))
-            # tripTime = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+            '''
             print(startTime)
             print(endTime)
             print(tripTime)
             print(*speed)
             print(*rpms)
+            '''
             speedGraph.plot(tripTime, speed)
             rpmGraph.plot(tripTime, rpms)
             engineGraph.plot(tripTime, engineLoad)
             print("plotted!")
+
+            # Trip log file i/o and data
+            tripsFile = open("pastTrips.docx", "a")
+
+            today = datetime.today()
+            formDate = today.strftime("%B %d, %Y")    # put date in month/day/year format
+            est = timezone('EST')   # Doesn't account for daylight savings, shows up as central time
+            trpLogTime = datetime.now(est).strftime("%H:%M:%S")
+            tripsFile.write("\n\nDate: " + formDate + " Time: " + trpLogTime + "C.T.\n")
+
+            # Trip time in seconds (add estimated distance?)
+            # Estimated distance math - Take the average miles per hour from the whole trip and divide by 60 then..
+            # .. divide that by 60 to get miles per second. Multiply mi/sec with total seconds
+            avgSpd = sum(speed)/len(speed)
+            estDistance = ((avgSpd/60)/60 * timeSec)
+            tripsFile.write("Total trip time: " + str(timeSec) + " Seconds. Estimated distance: " + str(estDistance)
+                            + "\n")
+
+            # Information about the check engine light
+            obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging purposes
+            connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+            checkForCodes = obd.commands.STATUS
+            statusRsp = connection.query(checkForCodes)
+            if not statusRsp.is_null():
+                if statusRsp.value.DTC_count == 0:
+                    tripsFile.write("Check Engine Light: Off\n")
+                else:
+                    tripsFile.write("Check Engine Light: On\n")
+                    codeReader = obd.commands.GET_DTC
+                    codeRsp = connection.query(codeReader)
+                    codeData = str(codeRsp.value)
+                    tripsFile.write("Trouble Code Data: " + codeData + "\n")
+            else:
+                tripsFile.write("Unable to retrieve trouble code information.\n")
+            connection.stop()
+            connection.close()
+
+            # Data for speed, rpms, engine load
+            tripsFile.write("Speed list: " + str(speed))
+            tripsFile.write("RPM list: " + str(rpms))
+            tripsFile.write("Engine load list: " + str(engineLoad))
+
+            tripsFile.close()
 
             # speedGraph.plot(hour, temperature)
 
@@ -224,6 +270,7 @@ class Example(QMainWindow):
                 connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
                 
             else:
+                # More than likely this should be left up to the start/end trip buttons
                 obd.logger.setLevel(
                     obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
                 connection = obd.Async(portstr="\\.\\COM3", baudrate=38400, fast=False)
@@ -384,10 +431,12 @@ class Example(QMainWindow):
         # Layout
         tripsLayout = QGridLayout()
         tripsLayout.setSpacing(10)
+
+        # The following code was taken from:
+        # https://stackoverflow.com/questions/50211133/open-a-pdf-by-clicking-on-qlabel-made-as-hyperlink
         tripLogTxt = QLabel()
-        path = r"C:\Users\jarahn\Documents\pastTrips.docx"
-        url = bytearray(QUrl.fromLocalFile(
-            path).toEncoded()).decode()  # file:///C:/Users/Shaurya/Documents/To%20be%20saved/hello.pdf
+        path = r"pastTrips.docx"  # r before "" treats the string as a raw string, no '\n' etc
+        url = bytearray(QUrl.fromLocalFile(path).toEncoded()).decode()
         text = "<a href={}>Past Trips Log </a>".format(url)
         tripLogTxt.setText(text)
         tripLogTxt.setOpenExternalLinks(True)
