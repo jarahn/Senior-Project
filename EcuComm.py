@@ -47,7 +47,7 @@ connection.start()
 # Let the asynch mode run for 60
 time.sleep(10)
 # Stop the asynch query (ALWAYS INCLUDE!!)
-connection.stop()
+# connection.stop()
 connection.close()
 
 obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes

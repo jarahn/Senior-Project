@@ -1,4 +1,4 @@
-# I used http://zetcode.com/gui/pyqt5 as a reference and guide for writing this program
+# I used http://zetcode.com/gui/pyqt5 as a reference and guide for learning pyqt
 import sys
 from PyQt5.QtWidgets import *
 # need these and maybe a few more (QWidget, QLabel, QLineEdit, QLCDNumber,
@@ -136,7 +136,7 @@ class Example(QMainWindow):
             print("starting trip!")
 
             # restart asynch connection - SHOULD HAVE A BOOLEAN FOR CHECKING IF ASYNCH OR STANDARD
-            '''
+
             global connection
             connection.close()
             obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
@@ -157,7 +157,7 @@ class Example(QMainWindow):
 
             # Start asynch connection
             connection.start()
-            '''
+
             # start counter for graph purposes
             global startTime
             startTime = time.time_ns()
@@ -183,13 +183,14 @@ class Example(QMainWindow):
             print(*speed)
             print(*rpms)
             '''
-            speedGraph.plot(tripTime, speed)
-            rpmGraph.plot(tripTime, rpms)
-            engineGraph.plot(tripTime, engineLoad)
+            tripzTime = range(0, len(speed))
+            speedGraph.plot(tripzTime, speed)
+            rpmGraph.plot(tripzTime, rpms)
+            engineGraph.plot(tripzTime, engineLoad)
             print("plotted!")
 
             # Trip log file i/o and data
-            tripsFile = open("pastTrips.docx", "a")
+            tripsFile = open("tLog.txt", "a")
 
             today = datetime.today()
             formDate = today.strftime("%B %d, %Y")    # put date in month/day/year format
@@ -197,7 +198,7 @@ class Example(QMainWindow):
             trpLogTime = datetime.now(est).strftime("%H:%M:%S")
             tripsFile.write("\n\nDate: " + formDate + " Time: " + trpLogTime + "C.T.\n")
 
-            # Trip time in seconds (add estimated distance?)
+            # Trip time in seconds and estimated distance
             # Estimated distance math - Take the average miles per hour from the whole trip and divide by 60 then..
             # .. divide that by 60 to get miles per second. Multiply mi/sec with total seconds
             avgSpd = sum(speed)/len(speed)
@@ -217,29 +218,33 @@ class Example(QMainWindow):
                     tripsFile.write("Check Engine Light: On\n")
                     codeReader = obd.commands.GET_DTC
                     codeRsp = connection.query(codeReader)
-                    codeData = str(codeRsp.value)
+                    # If this is giving an error change back to 'str(codeRsp.value)'
+                    codeData = ' '.join(map(str, codeRsp.value))
                     tripsFile.write("Trouble Code Data: " + codeData + "\n")
             else:
                 tripsFile.write("Unable to retrieve trouble code information.\n")
-            connection.stop()
+            # connection.stop()
             connection.close()
 
             # Data for speed, rpms, engine load
-            tripsFile.write("Speed list: " + str(speed))
-            tripsFile.write("RPM list: " + str(rpms))
-            tripsFile.write("Engine load list: " + str(engineLoad))
+            speedData = ' '.join(map(str, speed))
+            rpmData = ' '.join(map(str, rpms))
+            engineData = ' '.join(map(str, engineLoad))
+            tripsFile.write("Speed list: " + speedData + "\n")
+            tripsFile.write("RPM list: " + rpmData + "\n")
+            tripsFile.write("Engine load list: " + engineData + "\n")
 
             tripsFile.close()
 
             # speedGraph.plot(hour, temperature)
 
-        # This function should handle all connection changes, including the initial connection (needs to be tested)
+        # This function handles all connection changes, including the initial connection
             # - called every time the tab changes.
         def setConnection(tabIndex):
             print(tabIndex)
-            '''
+
             global connection
-            connection.stop()
+            # connection.stop()
             connection.close()
             
             if tabIndex == 0:
@@ -268,7 +273,7 @@ class Example(QMainWindow):
             elif tabIndex == 1:
                 obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
                 connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
-                
+            '''    
             else:
                 # More than likely this should be left up to the start/end trip buttons
                 obd.logger.setLevel(
@@ -435,7 +440,7 @@ class Example(QMainWindow):
         # The following code was taken from:
         # https://stackoverflow.com/questions/50211133/open-a-pdf-by-clicking-on-qlabel-made-as-hyperlink
         tripLogTxt = QLabel()
-        path = r"pastTrips.docx"  # r before "" treats the string as a raw string, no '\n' etc
+        path = r"tLog.txt"  # r before "" treats the string as a raw string, no '\n' etc
         url = bytearray(QUrl.fromLocalFile(path).toEncoded()).decode()
         text = "<a href={}>Past Trips Log </a>".format(url)
         tripLogTxt.setText(text)
@@ -530,6 +535,9 @@ if __name__ == '__main__':
     connection.watch(obd.commands.ENGINE_LOAD, callback=new_engineLd)
     connection.watch(obd.commands.INTAKE_TEMP, callback=new_intakeT)    
     '''
+    obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
+    connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+
     app = QApplication(sys.argv)
     # Calls the application class we created
     ex = Example()
