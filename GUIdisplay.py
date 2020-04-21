@@ -1,8 +1,5 @@
-# I used http://zetcode.com/gui/pyqt5 as a reference and guide for learning pyqt
 import sys
 from PyQt5.QtWidgets import *
-# need these and maybe a few more (QWidget, QLabel, QLineEdit, QLCDNumber,
-#                              QTextEdit, QGridLayout, QMainWindow, QAction, qApp, QApplication)
 from PyQt5.QtCore import *
 from PyQt5.QtGui import QIcon
 import pyqtgraph as pg
@@ -20,12 +17,7 @@ startTime = None
 endTime = None
 connection = None
 
-# speed = []
-# rpms = []
-# engineLoad = []
 
-
-# Testing github 2/24/20
 class Example(QMainWindow):
 
     def __init__(self):
@@ -46,14 +38,6 @@ class Example(QMainWindow):
 
         def checkTheCodes():
             print('Checking for codes!')
-            # STOP ASYNCH HERE AND START STANDARD CONNECTION
-            '''
-            global connection
-            connection.stop()
-            connection.close()
-            obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging purposes
-            connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
-            '''
             checkForCodes = obd.commands.STATUS
             statusRsp = connection.query(checkForCodes)
             if not statusRsp.is_null():
@@ -79,7 +63,8 @@ class Example(QMainWindow):
                 else:
                     codeReader = obd.commands.GET_DTC
                     codeRsp = connection.query(codeReader)
-                    codeData = str(codeRsp.value)
+                    # In case of error change back to str(codeRsp.value)
+                    codeData = ' '.join(map(str, codeRsp.value))
                     # Extract info out of the response tuple (codes) or list if multiple codes -ASK RANDY HOW TO DO THIS
             else:
                 codeData = "Unable to retrieve trouble code information."
@@ -107,17 +92,12 @@ class Example(QMainWindow):
                     speedResponse = connection.query(speedCmd)
                     freezeData = "Speed: " + str(speedResponse.value)
 
-                    # decide what other info is relevant and create queries
             else:
                 freezeData = "Unable to retrieve trouble code information."
 
-            # Take quotes off of freezeData when ready
             QMessageBox.information(self, 'Freeze Frame Data', freezeData, QMessageBox.Ok, QMessageBox.Ok)
 
         def clearTheCodes():
-            print('The car is fixed!')
-
-            # again - could optimize to only allow button click when checkTheCodes has a nonzero value
             checkForCodes = obd.commands.STATUS
             statusRsp = connection.query(checkForCodes)
 
@@ -125,7 +105,8 @@ class Example(QMainWindow):
                 if statusRsp.value.DTC_count == 0:
                     clearMsg = "No codes to clear!"
                 else:
-                    # obd.commands.CLEAR_DTC
+                    codeClear = obd.commands.CLEAR_DTC
+                    connection.query(codeClear)
                     clearMsg = "All codes cleared!"
             else:
                 clearMsg = "Unable to retrieve trouble code information."
@@ -135,8 +116,7 @@ class Example(QMainWindow):
         def startTripLog(self):
             print("starting trip!")
 
-            # restart asynch connection - SHOULD HAVE A BOOLEAN FOR CHECKING IF ASYNCH OR STANDARD
-
+            # restart asynch connection
             global connection
             connection.close()
             obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
@@ -236,8 +216,6 @@ class Example(QMainWindow):
 
             tripsFile.close()
 
-            # speedGraph.plot(hour, temperature)
-
         # This function handles all connection changes, including the initial connection
             # - called every time the tab changes.
         def setConnection(tabIndex):
@@ -273,36 +251,12 @@ class Example(QMainWindow):
             elif tabIndex == 1:
                 obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
                 connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
-            '''    
-            else:
-                # More than likely this should be left up to the start/end trip buttons
-                obd.logger.setLevel(
-                    obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
-                connection = obd.Async(portstr="\\.\\COM3", baudrate=38400, fast=False)
 
-                def new_speed(s):
-                    speed.append(int(s.value.magnitude))
-
-                def new_rpm(r):
-                    rpms.append(int(r.value.magnitude))
-
-                def new_load(ld):
-                    engineLoad.append(int(ld.value.magnitude))
-
-                connection.watch(obd.commands.SPEED, callback=new_speed)
-                connection.watch(obd.commands.RPM, callback=new_rpm)
-                connection.watch(obd.commands.ENGINE_LOAD, callback=new_load)
-                # Start asynch connection
-                connection.start()
-            '''
 
         # TODO: revise this section
         # creates a menu
         menubar = self.menuBar()
-        # creates a menu item - whatever that means
         fileMenu = menubar.addMenu('&Actions')
-        # menubar.addMenu('&Previous Trips')
-        # menubar.addMenu('&Settings')
         # adds desired action to the menu item
         fileMenu.addAction(exitAct)
 
@@ -376,7 +330,6 @@ class Example(QMainWindow):
         codesDsp = QLCDNumber(self)
 
         # Connect the button to a function on button click
-        # RANDY- why does using self tell python im talking about the function
         checkCodes.clicked.connect(checkTheCodes)
         readCodes.clicked.connect(readTheCodes)
         freezeFrame.clicked.connect(runFreezeFrame)
@@ -492,7 +445,6 @@ class Example(QMainWindow):
 
         # Event handlers for tab selection (to make sure the correct connection is established)
         tabWidget.currentChanged.connect(setConnection)
-        setConnection(0)    # Handles the initial asynch connection
         # Main styling for GUI
         # self.setStyleSheet("background-color:#6e6e6e")
         # Can also do like normal CSS ex:
@@ -505,6 +457,7 @@ class Example(QMainWindow):
         self.setGeometry(700, 250, 500, 400)
         self.setWindowTitle('Menu')
         self.show()
+        setConnection(0)  # Handles the initial asynch connection
 
         # Function connected to the check codes button press
 
@@ -535,8 +488,10 @@ if __name__ == '__main__':
     connection.watch(obd.commands.ENGINE_LOAD, callback=new_engineLd)
     connection.watch(obd.commands.INTAKE_TEMP, callback=new_intakeT)    
     '''
+    '''
     obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
     connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+    '''
 
     app = QApplication(sys.argv)
     # Calls the application class we created
