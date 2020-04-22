@@ -1,7 +1,8 @@
 import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import *
+from PyQt5 import QtGui
 import pyqtgraph as pg
 import obd
 import time
@@ -9,10 +10,12 @@ from datetime import datetime
 from pytz import timezone
 
 # Setting these as global variables for access from callback function
+'''
 speedDsp = None
 rpmDsp = None
 loadDsp = None
 tempDsp = None
+'''
 startTime = None
 endTime = None
 connection = None
@@ -22,6 +25,12 @@ class Example(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.setStyleSheet = """
+                 QMainWindow{
+                 background-color: aqua
+                 }
+        """
+        self.setWindowIcon(QtGui.QIcon('C:\\Users\\jarahn\\PycharmProjects\\CarStuff\\IconPic.jpg'))
         self.initUI()
 
     def initUI(self):
@@ -163,10 +172,14 @@ class Example(QMainWindow):
             print(*speed)
             print(*rpms)
             '''
-            tripzTime = range(0, len(speed))
-            speedGraph.plot(tripzTime, speed)
-            rpmGraph.plot(tripzTime, rpms)
-            engineGraph.plot(tripzTime, engineLoad)
+            tripSecs = len(speed)
+            tripzTime = range(0, tripSecs)
+            # Convert speed from kph to mph
+            for i in range(tripSecs):
+                speed[i] = int(0.621371*speed[i])
+            speedGraph.plot(tripzTime, speed, pen='g')
+            rpmGraph.plot(tripzTime, rpms, pen='r')
+            engineGraph.plot(tripzTime, engineLoad, pen='w')
             print("plotted!")
 
             # Trip log file i/o and data
@@ -176,14 +189,17 @@ class Example(QMainWindow):
             formDate = today.strftime("%B %d, %Y")    # put date in month/day/year format
             est = timezone('EST')   # Doesn't account for daylight savings, shows up as central time
             trpLogTime = datetime.now(est).strftime("%H:%M:%S")
-            tripsFile.write("\n\nDate: " + formDate + " Time: " + trpLogTime + "C.T.\n")
+            tripsFile.write("\n\nDate: " + formDate + " Time: " + trpLogTime + " C.T.\n")
 
             # Trip time in seconds and estimated distance
             # Estimated distance math - Take the average miles per hour from the whole trip and divide by 60 then..
             # .. divide that by 60 to get miles per second. Multiply mi/sec with total seconds
             avgSpd = sum(speed)/len(speed)
             estDistance = ((avgSpd/60)/60 * timeSec)
-            tripsFile.write("Total trip time: " + str(timeSec) + " Seconds. Estimated distance: " + str(estDistance)
+            # truncate estimated distance to the hundreds place
+            truncDist = int(estDistance*1000)
+            truncDist = float(truncDist/1000)
+            tripsFile.write("Total trip time: " + str(timeSec) + " Seconds. Estimated distance: " + str(truncDist)
                             + "\n")
 
             # Information about the check engine light
@@ -220,7 +236,7 @@ class Example(QMainWindow):
             # - called every time the tab changes.
         def setConnection(tabIndex):
             print(tabIndex)
-
+            '''
             global connection
             # connection.stop()
             connection.close()
@@ -230,7 +246,9 @@ class Example(QMainWindow):
                 connection = obd.Async(portstr="\\.\\COM3", fast=False)
 
                 def new_spd(s):
-                    speedDsp.display(int(s.value.magnitude))
+                    kphNum = int(s.value.magnitude)
+                    mphNum = int(0.621371*kphNum)
+                    speedDsp.display(mphNum)
 
                 def new_rotations(r):
                     rpmDsp.display(int(r.value.magnitude))
@@ -251,6 +269,7 @@ class Example(QMainWindow):
             elif tabIndex == 1:
                 obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
                 connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+            '''
 
 
         # TODO: revise this section
@@ -268,17 +287,19 @@ class Example(QMainWindow):
         # MAIN DASHBOARD WIDGET
 
         # setting labels for the widgets
-        speed = QLabel('Speed')
+        speedL = QLabel('Speed (MPH)')
         RPM = QLabel('RPMs')
-        codes = QLabel('Engine Load')
-        tempr = QLabel('Intake Air Temp.')
+        eLoad = QLabel('Engine Load (%)')
+        tempr = QLabel('Intake Air Temp. (°f)')
 
         # TODO: Hook up qlcd to the asynch callback function for speed, etc.
         # number display (called lcd)
+        '''
         global speedDsp
         global rpmDsp
         global loadDsp
         global tempDsp
+        '''
         speedDsp = QLCDNumber(self)
         rpmDsp = QLCDNumber(self)
         loadDsp = QLCDNumber(self)
@@ -290,17 +311,17 @@ class Example(QMainWindow):
         grid.setSpacing(10)
 
         # think of the window as a board, first 2 numbers are placement next 2 are span of widget
-        grid.addWidget(speed, 1, 0)
+        grid.addWidget(speedL, 1, 0)
         grid.addWidget(speedDsp, 1, 1, 2, 1)
 
         grid.addWidget(RPM, 3, 0)
         grid.addWidget(rpmDsp, 3, 1, 2, 1)
 
-        grid.addWidget(codes, 5, 0)
+        grid.addWidget(eLoad, 5, 0)
         grid.addWidget(loadDsp, 5, 1, 2, 1)
 
         grid.addWidget(tempr, 7, 0)
-        grid.addWidget(tempDsp, 7, 1, 1, 1)
+        grid.addWidget(tempDsp, 7, 1, 2, 1)
 
         # TODO:
         # ENGINE CODES WIDGET
@@ -314,18 +335,12 @@ class Example(QMainWindow):
         freezeFrame = QPushButton('Get Freeze Frame Data')      # open new window with info
         clearCodes = QPushButton('Clear Any Existing Codes')  # reset num and make button unclickable -display message?
 
-        # style for buttons
-        '''
-        clearCodes.setStyleSheet("QPushButton { background-color: blue }" "QPushButton:pressed { background-color: "
-                                 "red }")
-        '''
-
         # Button control for professional style
         readCodes.setEnabled(False)
         freezeFrame.setEnabled(False)
         clearCodes.setEnabled(False)
 
-        # Display for # of codes - Currently displays zero before button press consider changing
+        # Display for # of codes - Currently displays zero before button press
         numCodesLbl = QLabel('Number of Trouble Codes')
         codesDsp = QLCDNumber(self)
 
@@ -350,12 +365,12 @@ class Example(QMainWindow):
         graphsLayout = QGridLayout()
         graphsLayout.setSpacing(10)
 
-        # Create a graph widget
+        # Create graph widgets
         speedGraph = pg.PlotWidget()
         rpmGraph = pg.PlotWidget()
         engineGraph = pg.PlotWidget()
 
-        # button for starting/stopping trip (reconnect to asynch connection)
+        # button for starting/stopping trip
         startTrip = QPushButton('Start Your Trip')  # display in window
         stopTrip = QPushButton('Stop Your Trip')  # display in window
         startTrip.clicked.connect(startTripLog)
@@ -368,9 +383,6 @@ class Example(QMainWindow):
         speed = []
         rpms = []
         engineLoad = []
-        # speedGraph.plot(hour, temperature, pen='g')
-        # rpmGraph.plot(hour, temperature, pen='r')
-        # engineGraph.plot(hour, temperature, pen='w')
         rpmGraph.setLabel('left', 'Revolutions', units='per second')
         rpmGraph.setLabel('bottom', 'Time', units='s')
         speedGraph.setLabel('left', 'Speed', units='MPH')
@@ -399,7 +411,8 @@ class Example(QMainWindow):
         tripLogTxt.setText(text)
         tripLogTxt.setOpenExternalLinks(True)
         tripLogTxt.show()
-        tripsLayout.addWidget(tripLogTxt, 2, 1)
+        tripsLayout.setAlignment(Qt.AlignCenter)
+        tripsLayout.addWidget(tripLogTxt, 2, 2)
 
 
         # TODO:
@@ -446,16 +459,16 @@ class Example(QMainWindow):
         # Event handlers for tab selection (to make sure the correct connection is established)
         tabWidget.currentChanged.connect(setConnection)
         # Main styling for GUI
-        # self.setStyleSheet("background-color:#6e6e6e")
-        # Can also do like normal CSS ex:
-        '''
-        QMainWindow{
-            background-color:#6e6e6e;
-        }
-        '''
+        dash.setStyleSheet("background-color: #7FDBFF")
+        cel.setStyleSheet("background-color: #FF6F61")
+        # style for buttons
+        clearCodes.setStyleSheet("QPushButton { background-color: red }" "QPushButton:pressed { background-color: "
+                                 "green }")
+        startTrip.setStyleSheet("background-color: green")
+        stopTrip.setStyleSheet("background-color: red")
 
         self.setGeometry(700, 250, 500, 400)
-        self.setWindowTitle('Menu')
+        self.setWindowTitle('Vehicle Companion')
         self.show()
         setConnection(0)  # Handles the initial asynch connection
 
@@ -494,6 +507,8 @@ if __name__ == '__main__':
     '''
 
     app = QApplication(sys.argv)
+    app.setStyle('Fusion')
+
     # Calls the application class we created
     ex = Example()
 
