@@ -179,7 +179,10 @@ class Example(QMainWindow):
             print(*speed)
             print(*rpms)
             '''
+            # The update loop is controlled by calling start() and stop().
+            print(tripTime)
             tripSecs = len(speed)
+            print(tripSecs)
             tripzTime = range(0, tripSecs)
             # Convert speed from kph to mph
             for i in range(tripSecs):
@@ -278,6 +281,13 @@ class Example(QMainWindow):
                 connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
             '''
 
+        def submitLogInfo(odo, name, wthr):
+            tripsFile = open("tLog.txt", "a")
+            tripsFile.write("Current odometer: " + str(odo) + "\n")
+            tripsFile.write("Trip driver: " + name + "\n")
+            tripsFile.write("Trip weather conditions: " + wthr + "\n")
+            tripsFile.close()
+
 
         # TODO: revise this section
         # creates a menu
@@ -294,12 +304,11 @@ class Example(QMainWindow):
         # MAIN DASHBOARD WIDGET
 
         # setting labels for the widgets
-        speedL = QLabel('Speed (MPH)')
-        RPM = QLabel('RPMs')
-        eLoad = QLabel('Engine Load (%)')
-        tempr = QLabel('Intake Air Temp. (°f)')
+        speedL = QLabel('Speed (MPH):')
+        RPM = QLabel('RPMs:')
+        eLoad = QLabel('Engine Load (%):')
+        tempr = QLabel('Intake Air Temp. (°f):')
 
-        # TODO: Hook up qlcd to the asynch callback function for speed, etc.
         # number display (called lcd)
         '''
         global speedDsp
@@ -356,17 +365,26 @@ class Example(QMainWindow):
         numCodesLbl = QLabel('Number of Trouble Codes: ')
         codesDsp = QLCDNumber(self)
 
+        # Image
+        picLabel = QLabel('Check Engine Light')
+        CELpic = QPixmap('check-engine-pic.png')
+        picLabel.setPixmap(CELpic)
+
         # Connect the button to a function on button click
         checkCodes.clicked.connect(checkTheCodes)
         readCodes.clicked.connect(readTheCodes)
         freezeFrame.clicked.connect(runFreezeFrame)
         clearCodes.clicked.connect(clearTheCodes)
 
-        codesLayout.addWidget(checkCodes, 5, 0, 1, 1)
         # layout for title/number display
         codesLayout.addWidget(numCodesLbl, 0, 0)
         codesLayout.addWidget(codesDsp, 1, 0, 2, 1)
 
+        # Image layout
+        codesLayout.addWidget(picLabel, 1, 1)
+
+        # Buttons layout
+        codesLayout.addWidget(checkCodes, 5, 0, 1, 1)
         codesLayout.addWidget(readCodes, 5, 1, 1, 1)
         codesLayout.addWidget(freezeFrame, 6, 0, 1, 1)
         codesLayout.addWidget(clearCodes, 6, 1, 1, 1)
@@ -423,9 +441,27 @@ class Example(QMainWindow):
         tripLogTxt.setText(text)
         tripLogTxt.setOpenExternalLinks(True)
         tripLogTxt.show()
-        tripsLayout.setAlignment(Qt.AlignCenter)
+        submitBtn = QPushButton('Submit Information')
+        sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        submitBtn.setSizePolicy(sizePolicy)
+        submitBtn.clicked.connect(lambda: submitLogInfo(odomTextB.text(), driverTextB.text(), weatherTextB.text()))
+        odomTextB = QLineEdit()
+        driverTextB = QLineEdit()
+        weatherTextB = QLineEdit()
+        odomLbl = QLabel('Odometer:')
+        driverLbl = QLabel('Driver:')
+        weatherLbl = QLabel('Weather:')
+        # odomTextB.move(20, 20)
+        # odomTextB.resize(280, 40)
+        # tripsLayout.setAlignment(Qt.AlignCenter)
+        tripsLayout.addWidget(submitBtn, 2, 0)
         tripsLayout.addWidget(tripLogTxt, 2, 2)
-
+        tripsLayout.addWidget(odomLbl, 0, 0)
+        tripsLayout.addWidget(driverLbl, 0, 1)
+        tripsLayout.addWidget(weatherLbl, 0, 2)
+        tripsLayout.addWidget(odomTextB, 1, 0)
+        tripsLayout.addWidget(driverTextB, 1, 1)
+        tripsLayout.addWidget(weatherTextB, 1, 2)
 
         # TODO:
         # EMISSIONS WIDGET
@@ -495,13 +531,13 @@ class Example(QMainWindow):
         startTrip.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
         stopTrip.setStyleSheet("background-color: red; font-weight: bold")
         stopTrip.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        submitBtn.setStyleSheet("QPushButton { font-size: 8pt; font-weight: bold}")
+        submitBtn.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
 
         self.setGeometry(700, 250, 500, 400)
         self.setWindowTitle('Vehicle Companion')
         self.show()
         setConnection(0)  # Handles the initial asynch connection
-
-        # Function connected to the check codes button press
 
 
 if __name__ == '__main__':
