@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5 import QtGui
+from PyQt5 import QtCore
 import pyqtgraph as pg
 import obd
 import time
@@ -29,6 +30,11 @@ class Example(QMainWindow):
                  QMainWindow{
                  background-color: aqua
                  }
+                 QPushButton {
+                    font-size: 18pt;
+                    font-weight: bold;
+                    color: #ff0000;
+                }
         """
         self.setWindowIcon(QtGui.QIcon('C:\\Users\\jarahn\\PycharmProjects\\CarStuff\\IconPic.jpg'))
         self.initUI()
@@ -57,6 +63,7 @@ class Example(QMainWindow):
                     readCodes.setEnabled(True)
                     freezeFrame.setEnabled(True)
                     clearCodes.setEnabled(True)
+
             else:
                 print("Unable to retrieve trouble code information.")
 
@@ -327,13 +334,18 @@ class Example(QMainWindow):
         # ENGINE CODES WIDGET
         # Layout
         codesLayout = QGridLayout()
-        codesLayout.setSpacing(10)
+        codesLayout.setSpacing(0)
 
         #  Check CEL status/# of codes (buttons)
         checkCodes = QPushButton('Check For Trouble Codes')     # display in window
+        sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        checkCodes.setSizePolicy(sizePolicy)
         readCodes = QPushButton('Read Codes')       # open new window with info
+        readCodes.setSizePolicy(sizePolicy)
         freezeFrame = QPushButton('Get Freeze Frame Data')      # open new window with info
+        freezeFrame.setSizePolicy(sizePolicy)
         clearCodes = QPushButton('Clear Any Existing Codes')  # reset num and make button unclickable -display message?
+        clearCodes.setSizePolicy(sizePolicy)
 
         # Button control for professional style
         readCodes.setEnabled(False)
@@ -341,7 +353,7 @@ class Example(QMainWindow):
         clearCodes.setEnabled(False)
 
         # Display for # of codes - Currently displays zero before button press
-        numCodesLbl = QLabel('Number of Trouble Codes')
+        numCodesLbl = QLabel('Number of Trouble Codes: ')
         codesDsp = QLCDNumber(self)
 
         # Connect the button to a function on button click
@@ -350,14 +362,14 @@ class Example(QMainWindow):
         freezeFrame.clicked.connect(runFreezeFrame)
         clearCodes.clicked.connect(clearTheCodes)
 
-        codesLayout.addWidget(checkCodes, 1, 1, 2, 1)
+        codesLayout.addWidget(checkCodes, 5, 0, 1, 1)
         # layout for title/number display
-        codesLayout.addWidget(numCodesLbl, 3, 0)
-        codesLayout.addWidget(codesDsp, 3, 1, 1, 1)
+        codesLayout.addWidget(numCodesLbl, 0, 0)
+        codesLayout.addWidget(codesDsp, 1, 0, 2, 1)
 
-        codesLayout.addWidget(readCodes, 4, 1, 2, 1)
-        codesLayout.addWidget(freezeFrame, 5, 1, 2, 1)
-        codesLayout.addWidget(clearCodes, 6, 1, 2, 1)
+        codesLayout.addWidget(readCodes, 5, 1, 1, 1)
+        codesLayout.addWidget(freezeFrame, 6, 0, 1, 1)
+        codesLayout.addWidget(clearCodes, 6, 1, 1, 1)
 
         # TODO:
         # TRIP LOGGER WIDGET
@@ -458,14 +470,31 @@ class Example(QMainWindow):
 
         # Event handlers for tab selection (to make sure the correct connection is established)
         tabWidget.currentChanged.connect(setConnection)
+
         # Main styling for GUI
         dash.setStyleSheet("background-color: #7FDBFF")
         cel.setStyleSheet("background-color: #FF6F61")
+        # Style for labels
+        speedL.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
+        RPM.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
+        eLoad.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
+        tempr.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
+        numCodesLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
+
         # style for buttons
-        clearCodes.setStyleSheet("QPushButton { background-color: red }" "QPushButton:pressed { background-color: "
-                                 "green }")
-        startTrip.setStyleSheet("background-color: green")
-        stopTrip.setStyleSheet("background-color: red")
+        checkCodes.setStyleSheet("QPushButton { font-size: 8pt; font-weight: bold}")
+        checkCodes.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        readCodes.setStyleSheet("QPushButton { font-size: 8pt; font-weight: bold}")
+        readCodes.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        freezeFrame.setStyleSheet("QPushButton { font-size: 8pt; font-weight: bold}")
+        freezeFrame.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        clearCodes.setStyleSheet("QPushButton { background-color: red; font-size: 8pt; font-weight: bold} }"
+                                 "QPushButton:pressed { background-color: green }")
+        clearCodes.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        startTrip.setStyleSheet("background-color: green; font-weight: bold")
+        startTrip.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        stopTrip.setStyleSheet("background-color: red; font-weight: bold")
+        stopTrip.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
 
         self.setGeometry(700, 250, 500, 400)
         self.setWindowTitle('Vehicle Companion')
