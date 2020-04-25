@@ -58,6 +58,8 @@ class Example(QMainWindow):
             if not statusRsp.is_null():
                 if statusRsp.value.DTC_count == 0:
                     codesDsp.display(0)
+                    QMessageBox.information(self, 'Trouble Code Data', 'You have zero pending trouble codes.',
+                                            QMessageBox.Ok, QMessageBox.Ok)
                 else:
                     codesDsp.display(statusRsp.value.DTC_count)
                     readCodes.setEnabled(True)
@@ -65,7 +67,8 @@ class Example(QMainWindow):
                     clearCodes.setEnabled(True)
 
             else:
-                print("Unable to retrieve trouble code information.")
+                readErr = "Unable to retrieve trouble code information."
+                QMessageBox.information(self, 'Trouble Code Data', readErr, QMessageBox.Ok, QMessageBox.Ok)
 
         def readTheCodes():
             print('Codes read!')
@@ -124,6 +127,11 @@ class Example(QMainWindow):
                     codeClear = obd.commands.CLEAR_DTC
                     connection.query(codeClear)
                     clearMsg = "All codes cleared!"
+                    codesDsp.display(0)
+                    readCodes.setEnabled(False)
+                    freezeFrame.setEnabled(False)
+                    clearCodes.setEnabled(False)
+
             else:
                 clearMsg = "Unable to retrieve trouble code information."
 
@@ -242,6 +250,11 @@ class Example(QMainWindow):
 
             tripsFile.close()
 
+            # User message to remind them about entering trip info
+            QMessageBox.information(self, 'Ending trip. ', 'Remember: You can add trip info in the past trips tab.',
+                                    QMessageBox.Ok, QMessageBox.Ok)
+
+
         # This function handles all connection changes, including the initial connection
             # - called every time the tab changes.
         def setConnection(tabIndex):
@@ -286,7 +299,12 @@ class Example(QMainWindow):
             tripsFile.write("Current odometer: " + str(odo) + "\n")
             tripsFile.write("Trip driver: " + name + "\n")
             tripsFile.write("Trip weather conditions: " + wthr + "\n")
+            odomTextB.clear()
+            driverTextB.clear()
+            weatherTextB.clear()
             tripsFile.close()
+            QMessageBox.information(self, 'Success!', 'Your information has been added.', QMessageBox.Ok,
+                                    QMessageBox.Ok)
 
 
         # TODO: revise this section
@@ -381,7 +399,7 @@ class Example(QMainWindow):
         codesLayout.addWidget(codesDsp, 1, 0, 2, 1)
 
         # Image layout
-        codesLayout.addWidget(picLabel, 1, 1)
+        codesLayout.addWidget(picLabel, 1, 1, QtCore.Qt.AlignCenter)
 
         # Buttons layout
         codesLayout.addWidget(checkCodes, 5, 0, 1, 1)
@@ -454,14 +472,14 @@ class Example(QMainWindow):
         # odomTextB.move(20, 20)
         # odomTextB.resize(280, 40)
         # tripsLayout.setAlignment(Qt.AlignCenter)
-        tripsLayout.addWidget(submitBtn, 2, 0)
-        tripsLayout.addWidget(tripLogTxt, 2, 2)
+        tripsLayout.addWidget(submitBtn, 2, 0, 1, 1)
+        tripsLayout.addWidget(tripLogTxt, 2, 2, QtCore.Qt.AlignCenter)
         tripsLayout.addWidget(odomLbl, 0, 0)
         tripsLayout.addWidget(driverLbl, 0, 1)
         tripsLayout.addWidget(weatherLbl, 0, 2)
-        tripsLayout.addWidget(odomTextB, 1, 0)
-        tripsLayout.addWidget(driverTextB, 1, 1)
-        tripsLayout.addWidget(weatherTextB, 1, 2)
+        tripsLayout.addWidget(odomTextB, 1, 0, QtCore.Qt.AlignCenter)
+        tripsLayout.addWidget(driverTextB, 1, 1, QtCore.Qt.AlignCenter)
+        tripsLayout.addWidget(weatherTextB, 1, 2, QtCore.Qt.AlignCenter)
 
         # TODO:
         # EMISSIONS WIDGET
@@ -492,11 +510,11 @@ class Example(QMainWindow):
         pTrip = QWidget()
         pTrip.setLayout(tripsLayout)
         tabWidget.addTab(pTrip, "Previous Trips")
-
+        '''
         eTest = QWidget()
         eTest.setLayout(emissionsLayout)
         tabWidget.addTab(eTest, "Emissions Test")
-
+        '''
         tabsLayout.addWidget(tabWidget, 0, 0)
 
         # this allows you to place a widget as the central widget - keeping it separate from the main window
@@ -510,12 +528,16 @@ class Example(QMainWindow):
         # Main styling for GUI
         dash.setStyleSheet("background-color: #7FDBFF")
         cel.setStyleSheet("background-color: #FF6F61")
+        pTrip.setStyleSheet("background-color: #FCEED1")
         # Style for labels
         speedL.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         RPM.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         eLoad.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         tempr.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         numCodesLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
+        odomLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
+        driverLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
+        weatherLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
 
         # style for buttons
         checkCodes.setStyleSheet("QPushButton { font-size: 8pt; font-weight: bold}")
