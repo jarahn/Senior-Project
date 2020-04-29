@@ -1,7 +1,9 @@
 import sys
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+
+from PyQt5.QtCore import QUrl
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QLCDNumber, QGridLayout, \
+    QMainWindow, QAction, qApp, QMessageBox, QPushButton, QSizePolicy, QTabWidget
+from PyQt5.QtGui import QIcon, QCursor, QPixmap
 from PyQt5 import QtGui
 from PyQt5 import QtCore
 import pyqtgraph as pg
@@ -10,13 +12,7 @@ import time
 from datetime import datetime
 from pytz import timezone
 
-# Setting these as global variables for access from callback function
-'''
-speedDsp = None
-rpmDsp = None
-loadDsp = None
-tempDsp = None
-'''
+# Setting these as global variables for access from multiple scopes
 startTime = None
 endTime = None
 connection = None
@@ -52,7 +48,6 @@ class Example(QMainWindow):
         self.statusBar()
 
         def checkTheCodes():
-            print('Checking for codes!')
             checkForCodes = obd.commands.STATUS
             statusRsp = connection.query(checkForCodes)
             if not statusRsp.is_null():
@@ -65,7 +60,6 @@ class Example(QMainWindow):
                     readCodes.setEnabled(True)
                     freezeFrame.setEnabled(True)
                     clearCodes.setEnabled(True)
-
             else:
                 readErr = "Unable to retrieve trouble code information."
                 QMessageBox.information(self, 'Trouble Code Data', readErr, QMessageBox.Ok, QMessageBox.Ok)
@@ -254,14 +248,12 @@ class Example(QMainWindow):
             QMessageBox.information(self, 'Ending trip. ', 'Remember: You can add trip info in the past trips tab.',
                                     QMessageBox.Ok, QMessageBox.Ok)
 
-
         # This function handles all connection changes, including the initial connection
             # - called every time the tab changes.
         def setConnection(tabIndex):
             print(tabIndex)
             '''
             global connection
-            # connection.stop()
             connection.close()
             
             if tabIndex == 0:
@@ -280,7 +272,9 @@ class Example(QMainWindow):
                     loadDsp.display(int(ld.value.magnitude))
 
                 def new_intakeT(t):
-                    tempDsp.display(int(t.value.magnitude))
+                    tempC = int(t.value.magnitude)
+                    tempF = int(tempC * 9/5) + 32
+                    tempDsp.display(tempF)
 
                 connection.watch(obd.commands.SPEED, callback=new_spd)
                 connection.watch(obd.commands.RPM, callback=new_rotations)
@@ -341,21 +335,21 @@ class Example(QMainWindow):
         # speedDsp.display(speedDspNum)
 
         # using a grid layout to manage the layout of the page
-        grid = QGridLayout()
-        grid.setSpacing(10)
+        dashLayout = QGridLayout()
+        dashLayout.setSpacing(10)
 
         # think of the window as a board, first 2 numbers are placement next 2 are span of widget
-        grid.addWidget(speedL, 1, 0)
-        grid.addWidget(speedDsp, 1, 1, 2, 1)
+        dashLayout.addWidget(speedL, 1, 0)
+        dashLayout.addWidget(speedDsp, 1, 1, 2, 1)
 
-        grid.addWidget(RPM, 3, 0)
-        grid.addWidget(rpmDsp, 3, 1, 2, 1)
+        dashLayout.addWidget(RPM, 3, 0)
+        dashLayout.addWidget(rpmDsp, 3, 1, 2, 1)
 
-        grid.addWidget(eLoad, 5, 0)
-        grid.addWidget(loadDsp, 5, 1, 2, 1)
+        dashLayout.addWidget(eLoad, 5, 0)
+        dashLayout.addWidget(loadDsp, 5, 1, 2, 1)
 
-        grid.addWidget(tempr, 7, 0)
-        grid.addWidget(tempDsp, 7, 1, 2, 1)
+        dashLayout.addWidget(tempr, 7, 0)
+        dashLayout.addWidget(tempDsp, 7, 1, 2, 1)
 
         # TODO:
         # ENGINE CODES WIDGET
@@ -464,8 +458,11 @@ class Example(QMainWindow):
         submitBtn.setSizePolicy(sizePolicy)
         submitBtn.clicked.connect(lambda: submitLogInfo(odomTextB.text(), driverTextB.text(), weatherTextB.text()))
         odomTextB = QLineEdit()
+        odomTextB.setPlaceholderText("Odometer reading:")
         driverTextB = QLineEdit()
+        driverTextB.setPlaceholderText("Driver name:")
         weatherTextB = QLineEdit()
+        weatherTextB.setPlaceholderText("Current weather:")
         odomLbl = QLabel('Odometer:')
         driverLbl = QLabel('Driver:')
         weatherLbl = QLabel('Weather:')
@@ -496,7 +493,7 @@ class Example(QMainWindow):
 
         # You can add anything from a button or label to a full widget when adding a tab
         dash = QWidget()
-        dash.setLayout(grid)
+        dash.setLayout(dashLayout)
         tabWidget.addTab(dash, "Dashboard")
 
         cel = QWidget()
@@ -538,7 +535,8 @@ class Example(QMainWindow):
         odomLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         driverLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         weatherLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
-
+        # Style for text boxes
+        # odomTextB.setStyleSheet("color: white")
         # style for buttons
         checkCodes.setStyleSheet("QPushButton { font-size: 8pt; font-weight: bold}")
         checkCodes.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
@@ -588,10 +586,9 @@ if __name__ == '__main__':
     connection.watch(obd.commands.ENGINE_LOAD, callback=new_engineLd)
     connection.watch(obd.commands.INTAKE_TEMP, callback=new_intakeT)    
     '''
-    '''
-    obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
-    connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
-    '''
+
+ #   obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
+ #   connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
 
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
