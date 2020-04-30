@@ -1,5 +1,4 @@
 import sys
-
 from PyQt5.QtCore import QUrl
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QLCDNumber, QGridLayout, \
     QMainWindow, QAction, qApp, QMessageBox, QPushButton, QSizePolicy, QTabWidget
@@ -16,22 +15,13 @@ from pytz import timezone
 startTime = None
 endTime = None
 connection = None
+syncConn = None
 
 
-class Example(QMainWindow):
+class CarCommunication(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setStyleSheet = """
-                 QMainWindow{
-                 background-color: aqua
-                 }
-                 QPushButton {
-                    font-size: 18pt;
-                    font-weight: bold;
-                    color: #ff0000;
-                }
-        """
         self.setWindowIcon(QtGui.QIcon('C:\\Users\\jarahn\\PycharmProjects\\CarStuff\\IconPic.jpg'))
         self.initUI()
 
@@ -43,8 +33,7 @@ class Example(QMainWindow):
         # This status tip is displayed in the status bar on mouse over of the menu item
         exitAct.setStatusTip('Exit application')
         # Emits signal to terminate application - this is how you connect a function to a menu item or button
-        # This is highlighted for some reason but still works
-        exitAct.triggered.connect(qApp.quit)    # could I stop the asynch connection using this?
+        exitAct.triggered.connect(qApp.quit)
         self.statusBar()
 
         def checkTheCodes():
@@ -78,33 +67,33 @@ class Example(QMainWindow):
                     codeRsp = connection.query(codeReader)
                     # In case of error change back to str(codeRsp.value)
                     codeData = ' '.join(map(str, codeRsp.value))
-                    # Extract info out of the response tuple (codes) or list if multiple codes -ASK RANDY HOW TO DO THIS
             else:
                 codeData = "Unable to retrieve trouble code information."
+
             QMessageBox.information(self, 'Trouble Code Data', codeData, QMessageBox.Ok, QMessageBox.Ok)
 
         def runFreezeFrame():
-            print('Getting freeze frame data!')
-
             checkForCodes = obd.commands.STATUS
             statusRsp = connection.query(checkForCodes)
+
+            speedCmd = obd.commands.DTC_SPEED
+            speedResponse = connection.query(speedCmd)
 
             if not statusRsp.is_null():
                 if statusRsp.value.DTC_count == 0:
                     freezeData = "No Codes!"
+                elif speedResponse.value is None:
+                    freezeData = "Your vehicle does not store freeze frame information."
                 else:
                     # get RPMs when code was thrown
-                    '''
                     rpmCmd = obd.commands.DTC_RPM
                     rpmResponse = connection.query(rpmCmd)
                     freezeData = "RPMs: " + rpmResponse.value
-                    '''
 
                     # get speed when code was thrown
                     speedCmd = obd.commands.DTC_SPEED
                     speedResponse = connection.query(speedCmd)
                     freezeData = "Speed: " + str(speedResponse.value)
-
             else:
                 freezeData = "Unable to retrieve trouble code information."
 
@@ -125,20 +114,21 @@ class Example(QMainWindow):
                     readCodes.setEnabled(False)
                     freezeFrame.setEnabled(False)
                     clearCodes.setEnabled(False)
-
             else:
                 clearMsg = "Unable to retrieve trouble code information."
 
             QMessageBox.information(self, 'Clearing Codes', clearMsg, QMessageBox.Ok, QMessageBox.Ok)
 
-        def startTripLog(self):
+        def startTripLog():
             print("starting trip!")
 
-            # restart asynch connection
+            # Establish asynch connection to monitor desired variables
             global connection
+            global syncConn
             connection.close()
-            obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
+            obd.logger.setLevel(obd.logging.DEBUG)
             connection = obd.Async(portstr="\\.\\COM3", baudrate=38400, fast=False)
+            syncConn = False
 
             def new_speed(s):
                 speed.append(int(s.value.magnitude))
@@ -159,33 +149,26 @@ class Example(QMainWindow):
             # start counter for graph purposes
             global startTime
             startTime = time.time_ns()
-            # Enable stopping of trip
             stopTrip.setEnabled(True)
 
         def endTrip(prnt):
             print("ending the trip!")
 
-            # Stop Asynch connection
+            # Stop trip monitoring
             global connection
+            global syncConn
             connection.stop()
             connection.close()
 
             global endTime
             endTime = time.time_ns()
+            # Get the time in seconds
             timeSec = int((endTime - startTime) / 1000000000)
-            tripTime = range(0, int(timeSec))
-            '''
-            print(startTime)
-            print(endTime)
-            print(tripTime)
-            print(*speed)
-            print(*rpms)
-            '''
-            # The update loop is controlled by calling start() and stop().
-            print(tripTime)
+
             tripSecs = len(speed)
-            print(tripSecs)
+            # Used in case callback functions return a few more values than total seconds
             tripzTime = range(0, tripSecs)
+
             # Convert speed from kph to mph
             for i in range(tripSecs):
                 speed[i] = int(0.621371*speed[i])
@@ -203,7 +186,6 @@ class Example(QMainWindow):
             trpLogTime = datetime.now(est).strftime("%H:%M:%S")
             tripsFile.write("\n\nDate: " + formDate + " Time: " + trpLogTime + " C.T.\n")
 
-            # Trip time in seconds and estimated distance
             # Estimated distance math - Take the average miles per hour from the whole trip and divide by 60 then..
             # .. divide that by 60 to get miles per second. Multiply mi/sec with total seconds
             avgSpd = sum(speed)/len(speed)
@@ -212,11 +194,12 @@ class Example(QMainWindow):
             truncDist = int(estDistance*1000)
             truncDist = float(truncDist/1000)
             tripsFile.write("Total trip time: " + str(timeSec) + " Seconds. Estimated distance: " + str(truncDist)
-                            + "\n")
+                            + " Miles\n")
 
             # Information about the check engine light
-            obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging purposes
+            obd.logger.setLevel(obd.logging.DEBUG)
             connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+            syncConn = True
             checkForCodes = obd.commands.STATUS
             statusRsp = connection.query(checkForCodes)
             if not statusRsp.is_null():
@@ -231,7 +214,6 @@ class Example(QMainWindow):
                     tripsFile.write("Trouble Code Data: " + codeData + "\n")
             else:
                 tripsFile.write("Unable to retrieve trouble code information.\n")
-            # connection.stop()
             connection.close()
 
             # Data for speed, rpms, engine load
@@ -247,18 +229,22 @@ class Example(QMainWindow):
             # User message to remind them about entering trip info
             QMessageBox.information(self, 'Ending trip. ', 'Remember: You can add trip info in the past trips tab.',
                                     QMessageBox.Ok, QMessageBox.Ok)
+            stopTrip.setEnabled(False)
+            submitBtn.setEnabled(True)
 
         # This function handles all connection changes, including the initial connection
-            # - called every time the tab changes.
+        # called every time the tab changes.
         def setConnection(tabIndex):
             print(tabIndex)
             '''
             global connection
+            global syncConn
             connection.close()
             
             if tabIndex == 0:
                 obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging
                 connection = obd.Async(portstr="\\.\\COM3", fast=False)
+                syncConn = False
 
                 def new_spd(s):
                     kphNum = int(s.value.magnitude)
@@ -284,8 +270,10 @@ class Example(QMainWindow):
                 connection.start()
                 
             elif tabIndex == 1:
-                obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
-                connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+                if syncConn != True:
+                    obd.logger.setLevel(obd.logging.DEBUG)  
+                    connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
+                    syncConn = True
             '''
 
         def submitLogInfo(odo, name, wthr):
@@ -299,42 +287,27 @@ class Example(QMainWindow):
             tripsFile.close()
             QMessageBox.information(self, 'Success!', 'Your information has been added.', QMessageBox.Ok,
                                     QMessageBox.Ok)
+            submitBtn.setEnabled(False)
 
-
-        # TODO: revise this section
-        # creates a menu
+        # create menu
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&Actions')
-        # adds desired action to the menu item
         fileMenu.addAction(exitAct)
 
-        # Sets a toolbar and ties it to the desired action - not sure how to place images
-        # toolbar = self.addToolBar('Exit')
-        # toolbar.addAction(exitAct)
-
-        # TODO:
         # MAIN DASHBOARD WIDGET
 
-        # setting labels for the widgets
         speedL = QLabel('Speed (MPH):')
         RPM = QLabel('RPMs:')
         eLoad = QLabel('Engine Load (%):')
         tempr = QLabel('Intake Air Temp. (°f):')
 
-        # number display (called lcd)
-        '''
-        global speedDsp
-        global rpmDsp
-        global loadDsp
-        global tempDsp
-        '''
+        # number displays
         speedDsp = QLCDNumber(self)
         rpmDsp = QLCDNumber(self)
         loadDsp = QLCDNumber(self)
         tempDsp = QLCDNumber(self)
-        # speedDsp.display(speedDspNum)
 
-        # using a grid layout to manage the layout of the page
+        # grid layout to manage widget placement
         dashLayout = QGridLayout()
         dashLayout.setSpacing(10)
 
@@ -351,44 +324,40 @@ class Example(QMainWindow):
         dashLayout.addWidget(tempr, 7, 0)
         dashLayout.addWidget(tempDsp, 7, 1, 2, 1)
 
-        # TODO:
         # ENGINE CODES WIDGET
-        # Layout
         codesLayout = QGridLayout()
         codesLayout.setSpacing(0)
 
-        #  Check CEL status/# of codes (buttons)
-        checkCodes = QPushButton('Check For Trouble Codes')     # display in window
+        # Allow buttons to change sizes
         sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+
+        checkCodes = QPushButton('Check For Trouble Codes')
         checkCodes.setSizePolicy(sizePolicy)
-        readCodes = QPushButton('Read Codes')       # open new window with info
+        readCodes = QPushButton('Read Codes')
         readCodes.setSizePolicy(sizePolicy)
-        freezeFrame = QPushButton('Get Freeze Frame Data')      # open new window with info
+        freezeFrame = QPushButton('Get Freeze Frame Data')
         freezeFrame.setSizePolicy(sizePolicy)
-        clearCodes = QPushButton('Clear Any Existing Codes')  # reset num and make button unclickable -display message?
+        clearCodes = QPushButton('Clear Any Existing Codes')
         clearCodes.setSizePolicy(sizePolicy)
 
-        # Button control for professional style
+        # Button control for event determining access
         readCodes.setEnabled(False)
         freezeFrame.setEnabled(False)
         clearCodes.setEnabled(False)
 
-        # Display for # of codes - Currently displays zero before button press
         numCodesLbl = QLabel('Number of Trouble Codes: ')
         codesDsp = QLCDNumber(self)
 
-        # Image
         picLabel = QLabel('Check Engine Light')
         CELpic = QPixmap('check-engine-pic.png')
         picLabel.setPixmap(CELpic)
 
-        # Connect the button to a function on button click
         checkCodes.clicked.connect(checkTheCodes)
         readCodes.clicked.connect(readTheCodes)
         freezeFrame.clicked.connect(runFreezeFrame)
         clearCodes.clicked.connect(clearTheCodes)
 
-        # layout for title/number display
+        # Title/number display layout
         codesLayout.addWidget(numCodesLbl, 0, 0)
         codesLayout.addWidget(codesDsp, 1, 0, 2, 1)
 
@@ -401,9 +370,7 @@ class Example(QMainWindow):
         codesLayout.addWidget(freezeFrame, 6, 0, 1, 1)
         codesLayout.addWidget(clearCodes, 6, 1, 1, 1)
 
-        # TODO:
         # TRIP LOGGER WIDGET
-        # Layout
         graphsLayout = QGridLayout()
         graphsLayout.setSpacing(10)
 
@@ -412,19 +379,17 @@ class Example(QMainWindow):
         rpmGraph = pg.PlotWidget()
         engineGraph = pg.PlotWidget()
 
-        # button for starting/stopping trip
-        startTrip = QPushButton('Start Your Trip')  # display in window
-        stopTrip = QPushButton('Stop Your Trip')  # display in window
+        startTrip = QPushButton('Start Your Trip')
+        stopTrip = QPushButton('Stop Your Trip')
         startTrip.clicked.connect(startTripLog)
         stopTrip.clicked.connect(endTrip)
         stopTrip.setEnabled(False)
 
-        # Create points for the graph widget to plot
-        hour = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        temperature = [30, 32, 34, 32, 33, 31, 29, 32, 35, 45]
+        # Lists to store information from callback functions
         speed = []
         rpms = []
         engineLoad = []
+
         rpmGraph.setLabel('left', 'Revolutions', units='per second')
         rpmGraph.setLabel('bottom', 'Time', units='s')
         speedGraph.setLabel('left', 'Speed', units='MPH')
@@ -438,22 +403,22 @@ class Example(QMainWindow):
         graphsLayout.addWidget(rpmGraph, 1, 2)
         graphsLayout.addWidget(engineGraph, 1, 3)
 
-        # TODO:
         # PAST TRIPS WIDGET
-        # Layout
         tripsLayout = QGridLayout()
         tripsLayout.setSpacing(10)
 
         # The following code was taken from:
         # https://stackoverflow.com/questions/50211133/open-a-pdf-by-clicking-on-qlabel-made-as-hyperlink
         tripLogTxt = QLabel()
-        path = r"tLog.txt"  # r before "" treats the string as a raw string, no '\n' etc
+        path = r"tLog.txt"  # r before "" treats the string as a raw string, no '\n' etc - (J.R.)
         url = bytearray(QUrl.fromLocalFile(path).toEncoded()).decode()
         text = "<a href={}>Past Trips Log </a>".format(url)
         tripLogTxt.setText(text)
         tripLogTxt.setOpenExternalLinks(True)
         tripLogTxt.show()
+
         submitBtn = QPushButton('Submit Information')
+        submitBtn.setEnabled(False)
         sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         submitBtn.setSizePolicy(sizePolicy)
         submitBtn.clicked.connect(lambda: submitLogInfo(odomTextB.text(), driverTextB.text(), weatherTextB.text()))
@@ -466,9 +431,7 @@ class Example(QMainWindow):
         odomLbl = QLabel('Odometer:')
         driverLbl = QLabel('Driver:')
         weatherLbl = QLabel('Weather:')
-        # odomTextB.move(20, 20)
-        # odomTextB.resize(280, 40)
-        # tripsLayout.setAlignment(Qt.AlignCenter)
+
         tripsLayout.addWidget(submitBtn, 2, 0, 1, 1)
         tripsLayout.addWidget(tripLogTxt, 2, 2, QtCore.Qt.AlignCenter)
         tripsLayout.addWidget(odomLbl, 0, 0)
@@ -478,20 +441,12 @@ class Example(QMainWindow):
         tripsLayout.addWidget(driverTextB, 1, 1, QtCore.Qt.AlignCenter)
         tripsLayout.addWidget(weatherTextB, 1, 2, QtCore.Qt.AlignCenter)
 
-        # TODO:
-        # EMISSIONS WIDGET
-        # Layout
-        emissionsLayout = QGridLayout()
-        emissionsLayout.setSpacing(10)
-
-        # TODO: Tab Layout
         # Tabs can be added to a QTabWidget. The QTabWidget can be added to a layout and the layout to the window.
         tabsLayout = QGridLayout()
         tabsLayout.setSpacing(10)
-        # Creates a widget to hold tabs
+
         tabWidget = QTabWidget()
 
-        # You can add anything from a button or label to a full widget when adding a tab
         dash = QWidget()
         dash.setLayout(dashLayout)
         tabWidget.addTab(dash, "Dashboard")
@@ -507,11 +462,7 @@ class Example(QMainWindow):
         pTrip = QWidget()
         pTrip.setLayout(tripsLayout)
         tabWidget.addTab(pTrip, "Previous Trips")
-        '''
-        eTest = QWidget()
-        eTest.setLayout(emissionsLayout)
-        tabWidget.addTab(eTest, "Emissions Test")
-        '''
+
         tabsLayout.addWidget(tabWidget, 0, 0)
 
         # this allows you to place a widget as the central widget - keeping it separate from the main window
@@ -526,6 +477,7 @@ class Example(QMainWindow):
         dash.setStyleSheet("background-color: #7FDBFF")
         cel.setStyleSheet("background-color: #FF6F61")
         pTrip.setStyleSheet("background-color: #FCEED1")
+
         # Style for labels
         speedL.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         RPM.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
@@ -535,8 +487,7 @@ class Example(QMainWindow):
         odomLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         driverLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
         weatherLbl.setFont(QtGui.QFont("Times", 11, weight=QtGui.QFont.Bold))
-        # Style for text boxes
-        # odomTextB.setStyleSheet("color: white")
+
         # style for buttons
         checkCodes.setStyleSheet("QPushButton { font-size: 8pt; font-weight: bold}")
         checkCodes.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
@@ -554,50 +505,19 @@ class Example(QMainWindow):
         submitBtn.setStyleSheet("QPushButton { font-size: 8pt; font-weight: bold}")
         submitBtn.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
 
-        self.setGeometry(700, 250, 500, 400)
+        self.setGeometry(525, 200, 900, 675)
         self.setWindowTitle('Vehicle Companion')
         self.show()
         setConnection(0)  # Handles the initial asynch connection
 
 
 if __name__ == '__main__':
-    # Start gui in asynch mode so we can update live displays
-    '''
-    obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses for debugging purposes
-    connection = obd.Async(portstr="\\.\\COM3", fast=False)
-
-    def new_spd(s):
-        speedDsp.display(int(s.value.magnitude))
-
-
-    def new_rotations(r):
-        rpmDsp.display(int(r.value.magnitude))
-
-
-    def new_engineLd(ld):
-        loadDsp.display(int(ld.value.magnitude))
-
-
-    def new_intakeT(t):
-        tempDsp.display(int(t.value.magnitude))
-
-    connection.watch(obd.commands.SPEED, callback=new_spd)
-    connection.watch(obd.commands.RPM, callback=new_rotations)
-    connection.watch(obd.commands.ENGINE_LOAD, callback=new_engineLd)
-    connection.watch(obd.commands.INTAKE_TEMP, callback=new_intakeT)    
-    '''
-
- #   obd.logger.setLevel(obd.logging.DEBUG)  # prints the PID commands and their responses - debugging
- #   connection = obd.OBD(portstr="\\.\\COM3", baudrate=38400, fast=False)
 
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
 
     # Calls the application class we created
-    ex = Example()
-
-    # Start asynch query of all watched commands
-    # connection.start()
+    ex = CarCommunication()
     
     # Enters the gui application into its main loop
     sys.exit(app.exec_())
